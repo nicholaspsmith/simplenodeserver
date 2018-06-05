@@ -10,6 +10,8 @@ const REGISTER_FAIL = "REGISTER_FAIL"
 const LOGIN_ATTEMPT = "LOGIN_ATTEMPT"
 const LOGIN_FAIL = "LOGIN_FAIL"
 const LOGIN_SUCCESS = "LOGIN_GOOD"
+const UPDATE_PLAYER_POSITION = "UPDATE_PLAYER_POSITION"
+const PLAYER_DID_MOVE = "PLAYER_DID_MOVE"
 
 var {
   db,
@@ -17,6 +19,8 @@ var {
   insertMessage,
   registerUser,
   loginUser,
+  updatePlayerPosition,
+  getUsername,
 } = require('./mongo_db.js')
 
 var PORT = 3000
@@ -46,8 +50,9 @@ io.on("connection", (socket) => {
 
   socket.on(LOGIN_ATTEMPT, data => {
     var parsed = JSON.parse(data)
+    parsed.socketID = socket.id
     const { username, password } = parsed
-    // @TODO: Attempt to log this user in
+    // Attempt to log this user in
     loginUser(parsed, (success, user) => {
       if (success) {
         socket.emit(LOGIN_SUCCESS, JSON.stringify(user))
@@ -57,8 +62,19 @@ io.on("connection", (socket) => {
     })
   })
 
+  socket.on(UPDATE_PLAYER_POSITION, data => {
+    var parsed = JSON.parse(data)
+
+    updatePlayerPosition(parsed, (data) => {
+      // @TODO: inform all sockets of new player position
+      socket.emit(PLAYER_DID_MOVE, data)
+    })
+  })
+
   socket.on('disconnect', () => {
-    console.log(`A user left: ${socket.id}`)
+    getUsername(socket.id, (username) => {
+      console.log(`A user left: ${username}`)
+    })
   })
 });
 
