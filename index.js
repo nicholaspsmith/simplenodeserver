@@ -2,7 +2,7 @@ const app = require("express");
 const http = require("http").Server(app);
 const io = require("socket.io")(http);
 
-const LOGIN_READY = "LOGIN_READY"
+const MULTIPLAYER_ENABLED = "MULTIPLAYER_ENABLED"
 const GREETING = "GREETING"
 const REGISTER_ATTEMPT = "REGISTER_ATTEMPT"
 const REGISTER_SUCCESS = "REGISTER_SUCCESS"
@@ -17,10 +17,9 @@ var {
   db,
   fetchMessages,
   insertMessage,
-  registerUser,
-  loginUser,
   updatePlayerPosition,
-  getUsername,
+  registerTemporaryUser,
+  removeUserBySocketID,
 } = require('./mongo_db.js')
 
 var PORT = 3000
@@ -28,52 +27,28 @@ var PORT = 3000
 
 // Socket Server
 io.on("connection", (socket) => {
-  console.log("A user connected.");
-  socket.on(GREETING, (data) => {
-    socket.emit("LOGIN_READY", data);
+  console.log("A user connected");
+  socket.on(GREETING, (sessionID) => {
+    console.log(`A user identified as: ${sessionID}`);
+    const data = { sessionID, socketID: socket.id }
+    registerTemporaryUser(data, (res) => {
+      socket.emit("MULTIPLAYER_ENABLED", data);
+    })
   });
-
-  socket.on(REGISTER_ATTEMPT, data => {
-    var parsed = JSON.parse(data)
-    const { username, password } = parsed
-    // Attempt to create this user in Mongodb
-    registerUser(parsed, (res)=> {
-      if (res === "success") {
-        socket.emit(REGISTER_SUCCESS)
-        console.log(REGISTER_SUCCESS)
-      } else {
-        socket.emit(REGISTER_FAIL)
-        console.log(REGISTER_FAIL)
-      }
-    })
-  })
-
-  socket.on(LOGIN_ATTEMPT, data => {
-    var parsed = JSON.parse(data)
-    parsed.socketID = socket.id
-    const { username, password } = parsed
-    // Attempt to log this user in
-    loginUser(parsed, (success, user) => {
-      if (success) {
-        socket.emit(LOGIN_SUCCESS, JSON.stringify(user))
-      } else {
-        socket.emit(LOGIN_FAIL)
-      }
-    })
-  })
 
   socket.on(UPDATE_PLAYER_POSITION, data => {
     var parsed = JSON.parse(data)
-
-    updatePlayerPosition(parsed, (data) => {
+    parsed.socketID = socket.id
+    updatePlayerPosition(parsed, () => {
       // @TODO: inform all sockets of new player position
-      socket.emit(PLAYER_DID_MOVE, data)
+      socket.broadcast.emit(PLAYER_DID_MOVE, data)
     })
   })
 
   socket.on('disconnect', () => {
-    getUsername(socket.id, (username) => {
-      console.log(`A user left: ${username}`)
+    // remove temporary user from database
+    removeUserBySocketID(socket.id, (res) => {
+      console.log(`A user left: ${socket.id}`)
     })
   })
 });

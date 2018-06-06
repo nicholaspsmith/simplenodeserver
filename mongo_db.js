@@ -27,75 +27,60 @@ const insertMessage = (message, callback) => {
   })
 }
 
-const registerUser = (data, callback) => {
-  const { username, password } = data
+const registerTemporaryUser = (data, callback) => {
+  const { sessionID, socketID } = data
   const collection = db.collection('users')
 
-  collection.findOne({ username }, (err, res) => {
+  collection.findOne({ sessionID }, (err, res) => {
     assert.equal(err, null)
     if (res == null) {
       collection.insert({
-        username,
-        password,
-        sprite: 4,
-        map: 'rm_map_home',
-        x: 320,
-        y: 320,
-      }, (err, res) => {
-        assert.equal(err, null)
-        callback('success')
+        sessionID,
+        socketID,
       })
-    } else {
-      callback("User exists")
     }
+    callback()
   })
 }
 
-const loginUser = (data, callback) => {
-  const { username, password, socketID } = data
+const removeUserBySocketID = (id, callback) => {
   const collection = db.collection('users')
-  
-  collection.findOne({ username }, (err, user) => {
-    if (!err && user) {
-      if (user.password = password) {
-        collection.update({ username }, { $set: {socketID} })
-        return callback(true, user)
-      }
-    }
-    callback(false, null)
+  collection.remove({ socketID: id }, (err, res) => {
+    assert.equal(err, null)
+    callback(res)
   })
 }
 
 const updatePlayerPosition = (data, callback) => {
-  const { name, x, y, sprite } = data
+  const {
+    sessionID,
+    socketID,
+    x,
+    y,
+    sprite_index,
+    room,
+  } = data
   const collection = db.collection('users')
 
-  collection.update({ username: name }, { $set: {
+  collection.update({ sessionID: sessionID }, { $set: {
+    socketID: socketID,
     x: x,
     y: y,
-    sprite: sprite,
+    sprite_index: sprite_index,
+    room: room,
   }}, (err, res) => {
     assert.equal(err, null)
     callback(data)
   })
 }
 
-const getUsername = (socketID, callback) => {
-  const collection = db.collection('users')
 
-  collection.findOne({ socketID }, (err, res) => {
-    assert.equal(err, null)
-    if (res == null) callback('Unregistered user')
-    else callback(res.username)
-  })
-}
 
 module.exports = {
   db,
   fetchMessages,
   insertMessage,
-  registerUser,
-  loginUser,
-  getUsername,
   updatePlayerPosition,
+  registerTemporaryUser,
+  removeUserBySocketID,
 }
